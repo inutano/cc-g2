@@ -37,6 +37,8 @@ SCRIPT_PATH="$(resolve_script_path "${BASH_SOURCE[0]}")"
 G2_PROJECT_DIR="${G2_PROJECT_DIR:-$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd -P)}"
 HUB_PORT="${HUB_PORT:-8787}"
 VITE_PORT="${VITE_PORT:-5173}"
+CC_G2_HUB_URL="${CC_G2_HUB_URL:-http://127.0.0.1:${HUB_PORT}}"
+CC_G2_HOSTNAME="${CC_G2_HOSTNAME:-$(hostname -s 2>/dev/null || hostname)}"
 CLAUDE_BIN="${CLAUDE_BIN:-$HOME/.local/bin/claude}"
 
 RED='\033[0;31m'
@@ -274,6 +276,8 @@ launch_tmux_session_detached() {
     -e CC_G2_TMUX_TARGET="${session_name}:0.0"
     -e CC_G2_ENABLE_STATUSLINE="${ENABLE_STATUSLINE}"
     -e CC_G2_ORIG_STATUSLINE_CMD="${ORIG_STATUSLINE_CMD}"
+    -e CC_G2_HUB_URL="${CC_G2_HUB_URL}"
+    -e CC_G2_HOSTNAME="${CC_G2_HOSTNAME}"
   )
   local nested_args=()
   if [ "$use_codex" = "1" ]; then
@@ -404,10 +408,10 @@ check_deps() {
 check_deps
 CLAUDE_BIN="$(resolve_claude_bin)"
 
-is_hub_running()  { curl -s --max-time 1 "http://127.0.0.1:$HUB_PORT/api/health" >/dev/null 2>&1; }
+is_hub_running()  { curl -s --max-time 1 "${CC_G2_HUB_URL}/api/health" >/dev/null 2>&1; }
 is_vite_running() { lsof -i ":$VITE_PORT" -P 2>/dev/null | grep -q LISTEN; }
 is_voice_entry_running() {
-  curl -s --max-time 1 "http://127.0.0.1:$VOICE_ENTRY_PORT/health" >/dev/null 2>&1
+  curl -s --max-time 1 "${CC_G2_VOICE_ENTRY_URL:-http://127.0.0.1:$VOICE_ENTRY_PORT}/health" >/dev/null 2>&1
 }
 voice_entry_token_matches() {
   [ "$VOICE_ENTRY_ENABLED" = "1" ] || return 0
@@ -416,7 +420,7 @@ voice_entry_token_matches() {
   code=$(
     curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
       -H "authorization: Bearer ${VOICE_ENTRY_TOKEN}" \
-      "http://127.0.0.1:${VOICE_ENTRY_PORT}/auth-check" 2>/dev/null || true
+      "${CC_G2_VOICE_ENTRY_URL:-http://127.0.0.1:${VOICE_ENTRY_PORT}}/auth-check" 2>/dev/null || true
   )
   [ "$code" = "200" ]
 }
@@ -428,7 +432,7 @@ hub_auth_token_matches() {
     code=$(
       curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
         -H "X-CC-G2-Token: ${HUB_AUTH_TOKEN}" \
-        "http://127.0.0.1:${HUB_PORT}/api/auth-check" 2>/dev/null || true
+        "${CC_G2_HUB_URL}/api/auth-check" 2>/dev/null || true
     )
     [ "$code" = "200" ] && return 0
     sleep 0.2
@@ -765,6 +769,8 @@ if [ -z "${TMUX:-}" ] || [ "$FORCE_NEW_SESSION" = "1" ]; then
       -e CC_G2_TMUX_TARGET="${TMUX_SESSION}:0.0"
       -e CC_G2_ENABLE_STATUSLINE="${ENABLE_STATUSLINE}"
       -e CC_G2_ORIG_STATUSLINE_CMD="${ORIG_STATUSLINE_CMD}"
+      -e CC_G2_HUB_URL="${CC_G2_HUB_URL}"
+      -e CC_G2_HOSTNAME="${CC_G2_HOSTNAME}"
     )
     if ! tmux new-session -s "$TMUX_SESSION" -c "$WORK_DIR" \
       "${tmux_env[@]}" \
@@ -811,8 +817,9 @@ STATUSLINE_CMD=""
 [ "$ENABLE_STATUSLINE" = "1" ] && [ -x "$STATUSLINE_SCRIPT" ] && STATUSLINE_CMD="bash ${STATUSLINE_SCRIPT}"
 
 SETTINGS_JSON=$(jq -nc \
-  --arg hub_url "http://127.0.0.1:${HUB_PORT}" \
+  --arg hub_url "${CC_G2_HUB_URL}" \
   --arg hub_token "$HUB_AUTH_TOKEN" \
+  --arg g2_hostname "$CC_G2_HOSTNAME" \
   --arg statusline_cmd "$STATUSLINE_CMD" \
   --arg stop_cmd "bash ${STOP_NOTIFY_SCRIPT}" \
   '{
@@ -823,7 +830,7 @@ SETTINGS_JSON=$(jq -nc \
           type: "http",
           url: ($hub_url + "/api/hooks/permission-request"),
           timeout: 310,
-          headers: {"X-Tmux-Target": "$CC_G2_TMUX_TARGET", "X-CC-G2-Token": $hub_token},
+          headers: {"X-Tmux-Target": "$CC_G2_TMUX_TARGET", "X-CC-G2-Token": $hub_token, "X-CC-G2-Hostname": $g2_hostname},
           allowedEnvVars: ["CC_G2_TMUX_TARGET"]
         }]
       }],

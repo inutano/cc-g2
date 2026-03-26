@@ -13,6 +13,7 @@ input=$(cat)
 
 HUB_PORT="${HUB_PORT:-8787}"
 HUB_AUTH_TOKEN="${HUB_AUTH_TOKEN:-}"
+HUB_URL="${CC_G2_HUB_URL:-http://127.0.0.1:${HUB_PORT}}"
 ORIG_STATUSLINE_CMD="${CC_G2_ORIG_STATUSLINE_CMD:-}"
 
 # コンテキスト占有率をトークン数から計算（used_percentageは初期nullの場合があるため）
@@ -49,7 +50,7 @@ fi
 # Hub にコンテキスト情報を送信（非同期、失敗は無視）
 # current_usage が null（セッション開始直後）の場合は pct=0 を送信しない
 if [ "${pct:-0}" -gt 0 ]; then
-  curl -s -X POST "http://127.0.0.1:${HUB_PORT}/api/context-status" \
+  curl -s -X POST "${HUB_URL}/api/context-status" \
     -H "Content-Type: application/json" \
     ${HUB_AUTH_TOKEN:+-H "X-CC-G2-Token: ${HUB_AUTH_TOKEN}"} \
     -d "{\"sessionId\":\"${session}\",\"cwd\":\"${cwd}\",\"usedPercentage\":${pct},\"model\":\"${model}\"}" \

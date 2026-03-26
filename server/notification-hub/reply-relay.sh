@@ -95,6 +95,7 @@ eval "$(
     const cwd = typeof m.cwd === "string" ? m.cwd.trim() : "";
     const project = typeof m.project === "string" ? m.project.trim() : "";
     const sessionLabel = typeof m.sessionLabel === "string" ? m.sessionLabel.trim() : "";
+    const hostname = typeof m.hostname === "string" ? m.hostname.trim() : "";
     const isApproval = (m.hookType === "permission-request" || m.approvalId) ? "1" : "0";
     const replyAction = r.resolvedAction || r.action || "unknown";
     const replyComment = normalize(r.comment || r.replyText || "");
@@ -103,6 +104,7 @@ eval "$(
       `summary=\x27${q(summaryLines.join("\\n"))}\x27`,
       `tmux_message=\x27${q(tmuxMsg)}\x27`,
       `notification_tmux_target=\x27${q(tmuxTarget)}\x27`,
+      `notification_hostname=\x27${q(hostname)}\x27`,
       `notification_agent_name=\x27${q(agentName)}\x27`,
       `notification_cwd=\x27${q(cwd)}\x27`,
       `notification_project=\x27${q(project)}\x27`,
@@ -345,6 +347,16 @@ run_agent_cmd() {
 }
 
 if [[ "$RELAY_ENABLE_TMUX" == "1" ]]; then
+  # Skip tmux relay for notifications from remote hosts (tmux pane is not local)
+  if [[ -n "$notification_hostname" ]]; then
+    local_hostname="$(hostname -s 2>/dev/null || hostname)"
+    if [[ "$notification_hostname" != "$local_hostname" ]]; then
+      echo "relay skipped: remote host (${notification_hostname} != ${local_hostname})" >&2
+      printf 'relay_skipped=remote_host hostname=%s local=%s\n' \
+        "$notification_hostname" "$local_hostname" >> "$RELAY_AGENT_LOG_FILE"
+      exit 0
+    fi
+  fi
   send_tmux_message
 fi
 

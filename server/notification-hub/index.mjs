@@ -640,6 +640,7 @@ async function handlePermissionRequestHook(req, res) {
   }
   const p = parsed.value
   const tmuxTarget = req.headers['x-tmux-target'] || ''
+  const g2Hostname = req.headers['x-cc-g2-hostname'] || ''
   const toolName = getString(p.tool_name)
   const toolInput = p.tool_input || {}
   const cwd = getString(p.cwd)
@@ -667,6 +668,7 @@ async function handlePermissionRequestHook(req, res) {
       sessionLabel: deriveSessionLabel(tmuxTarget),
       sessionId,
       agentName: 'claude-code',
+      ...(g2Hostname ? { hostname: g2Hostname } : {}),
     },
   })
 

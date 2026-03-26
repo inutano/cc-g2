@@ -112,11 +112,14 @@ function getNotificationPrefix(item: NotificationItem): string {
   const cwd = typeof meta.cwd === 'string' ? meta.cwd.trim() : ''
   const projectMeta = typeof meta.project === 'string' ? meta.project.trim() : ''
   const safeProject = projectMeta || (cwd && cwd !== '[REDACTED]' ? extractProjectSlug(cwd) : '')
+  const hostname = typeof meta.hostname === 'string' ? meta.hostname.trim() : ''
+  const hostPrefix = hostname ? `${hostname}:` : ''
   const moshi = item.source !== 'claude-code' ? 'M:' : ''
   if (moshi) return moshi
-  if (safeProject && sessionLabel) return `${safeProject}${sessionLabel}:`
-  if (safeProject) return `${safeProject}:`
-  if (sessionLabel) return `${sessionLabel}:`
+  if (safeProject && sessionLabel) return `${hostPrefix}${safeProject}${sessionLabel}:`
+  if (safeProject) return `${hostPrefix}${safeProject}:`
+  if (sessionLabel) return `${hostPrefix}${sessionLabel}:`
+  if (hostname) return `${hostPrefix}`
   return ''
 }
 

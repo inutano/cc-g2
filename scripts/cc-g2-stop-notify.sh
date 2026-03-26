@@ -60,7 +60,8 @@ fi
 
 HUB_PORT="${HUB_PORT:-8787}"
 HUB_AUTH_TOKEN="${HUB_AUTH_TOKEN:-}"
-HUB_URL="http://127.0.0.1:${HUB_PORT}"
+HUB_URL="${CC_G2_HUB_URL:-http://127.0.0.1:${HUB_PORT}}"
+CC_G2_HOSTNAME="${CC_G2_HOSTNAME:-$(hostname -s 2>/dev/null || hostname)}"
 
 # Hub が起動しているか簡易チェック
 CURRENT_STEP="hub_healthcheck"
@@ -218,6 +219,7 @@ PAYLOAD=$(jq -n \
   --arg agent "claude-code" \
   --arg tmuxTarget "${TMUX_TARGET:-}" \
   --arg sessionLabel "${SESSION_LABEL:-}" \
+  --arg hostname "${CC_G2_HOSTNAME}" \
   --arg ts "$(date +%s)" \
   '{
     title: $title,
@@ -235,7 +237,8 @@ PAYLOAD=$(jq -n \
       project: $project,
       agentName: $agent,
       tmuxTarget: (if $tmuxTarget == "" then null else $tmuxTarget end),
-      sessionLabel: (if $sessionLabel == "" then null else $sessionLabel end)
+      sessionLabel: (if $sessionLabel == "" then null else $sessionLabel end),
+      hostname: (if $hostname == "" then null else $hostname end)
     }
   }')
 
