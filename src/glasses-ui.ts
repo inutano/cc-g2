@@ -585,24 +585,42 @@ export function createGlassesUI() {
         return
       }
 
-      const actionItems = ['コメント', '拒否', '承認', '◀ 戻る']
+      const prefix = getNotificationPrefix(detail)
+      const headerText = `${prefix}${detail.title}`
+
+      // Show command preview from fullText (truncated to fit)
+      const previewText = (detail.fullText || '').replace(/^Tool:\s*\S+\s*/i, '').replace(/^CWD:\s*\S+\s*/i, '').trim()
+      const previewTruncated = previewText.length > 120 ? `${previewText.slice(0, 117)}...` : previewText
+
+      const actionItems = ['Approve', 'Deny', 'Comment']
 
       const headerContainer = new TextContainerProperty({
         xPosition: 8,
         yPosition: 4,
         width: 560,
-        height: 52,
+        height: 30,
         containerID: 1,
         containerName: 'notif-act-hdr',
-        content: `操作を選択\n${detail.title.length > 20 ? `${detail.title.slice(0, 19)}…` : detail.title}`,
+        content: headerText,
+        isEventCapture: 0,
+      })
+
+      const previewContainer = new TextContainerProperty({
+        xPosition: 8,
+        yPosition: 36,
+        width: 560,
+        height: 80,
+        containerID: 3,
+        containerName: 'notif-act-prv',
+        content: previewTruncated,
         isEventCapture: 0,
       })
 
       const listContainer = new ListContainerProperty({
         xPosition: 8,
-        yPosition: 58,
+        yPosition: 120,
         width: 560,
-        height: 210,
+        height: 150,
         containerID: 2,
         containerName: 'notif-act-lst',
         itemContainer: new ListItemContainerProperty({
@@ -615,7 +633,7 @@ export function createGlassesUI() {
       })
 
       await renderStartupPage(conn, {
-        texts: [headerContainer],
+        texts: [headerContainer, previewContainer],
         lists: [listContainer],
         targetLayout: 'notif-actions',
       })

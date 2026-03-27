@@ -867,15 +867,9 @@ async function handleNotifEvent(conn: BridgeConnection, event: EvenHubEvent) {
           try {
             const detail = await notifClient.detail(item.id)
             notifState.detailItem = detail
-            const pageCount = glassesUI.getDetailPageCount(detail.fullText)
-            notifState.detailPages = Array.from({ length: pageCount }, (_, i) => String(i))
-            notifState.detailPageIndex = 0
-            notifState.screen = 'detail'
-            await glassesUI.showNotificationDetail(connection!, detail, 0, pageCount, getContextPctForNotification(detail))
-            // 描画中（createStartUpフォールバックで数秒かかる）にキューされたスクロールイベントを破棄
-            // tap/doubleTap等の非スクロールイベントは保持する
+            notifState.screen = 'detail-actions'
+            await glassesUI.showNotificationActions(connection!, detail)
             clearPendingScrollEvent()
-            lastDetailScrollAt = Date.now()
             updateNotifInfo()
           } catch (err) {
             log(`通知詳細取得失敗: ${err instanceof Error ? err.message : String(err)}`)
@@ -943,24 +937,25 @@ async function handleNotifEvent(conn: BridgeConnection, event: EvenHubEvent) {
       } else if (notifState.screen === 'detail-actions') {
         if (!notifState.detailItem) return
 
+        // Double-tap: back to list
+        if (isDoubleTapEventType(eventType)) {
+          log('通知アクション: double tap → 一覧に戻る')
+          notifState.screen = 'list'
+          notifState.detailItem = null
+          notifState.selectedIndex = 0
+          await glassesUI.showNotificationList(connection!, notifState.items)
+          updateNotifInfo()
+          return
+        }
+
         // SDK標準ListContainer: listEventからクリック選択を取得
+        // New order: 0=Approve, 1=Deny, 2=Comment
         if (normalized.source === 'list') {
           const index = normalized.index ?? 0
 
-          // ◀ 戻る (index=3)
-          if (index === 3) {
-            log('通知アクション: 一覧に戻る')
-            notifState.screen = 'list'
-            notifState.detailItem = null
-            notifState.selectedIndex = 0
-            await glassesUI.showNotificationList(connection!, notifState.items)
-            updateNotifInfo()
-            return
-          }
-
-          if (index === 1 || index === 2) {
-            // 拒否(1) or 承認(2)
-            const action = index === 2 ? 'approve' : 'deny'
+          if (index === 0 || index === 1) {
+            // Approve(0) or Deny(1)
+            const action = index === 0 ? 'approve' : 'deny'
             log(`通知アクション送信: ${action} notificationId=${notifState.detailItem.id}`)
             notifState.screen = 'reply-sending'
             updateNotifInfo()
@@ -975,7 +970,7 @@ async function handleNotifEvent(conn: BridgeConnection, event: EvenHubEvent) {
               // await 中にユーザー操作でリストに戻っていたら結果画面をスキップ
               if (notifState.screen === 'reply-sending') {
                 if (result.ok) {
-                  await glassesUI.showReplyResult(connection!, true, action === 'approve' ? '承認' : '拒否')
+                  await glassesUI.showReplyResult(connection!, true, action === 'approve' ? 'Approved' : 'Denied')
                 } else {
                   await glassesUI.showReplyResult(connection!, false, result.message || status)
                 }
@@ -991,8 +986,8 @@ async function handleNotifEvent(conn: BridgeConnection, event: EvenHubEvent) {
             return
           }
 
-          if (index === 0) {
-            // コメント
+          if (index === 2) {
+            // Comment
             log('通知アクション: コメント（録音開始）')
             notifState.screen = 'reply-recording'
             notifState.replyText = ''
